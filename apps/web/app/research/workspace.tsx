@@ -7,6 +7,8 @@ import { ResearchMoneyCell, ResearchPerformanceSummary, ResearchStakeInput } fro
 import { EVIDENCE_WINDOW_DAYS, forecastEvidence } from "@highodds/core";
 import { loadForecastEvidence } from "../../lib/forecast-evidence";
 import { resolveResearchQuote } from "../../lib/research-odds";
+import { loadResearchDecisionPrices } from "../../lib/research-decision-prices";
+import { legOutcome, summarizeResearchRows } from "@highodds/core";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,7 @@ const fixtureInclude = {
 };
 const highProbabilityFixtureInclude = {
   competition: true, homeTeam: true, awayTeam: true,
-  predictions: { where: { stage: "SELECTION" as const }, orderBy: { asOfAt: "desc" as const }, include: { market: true, modelRun: true } }
+  predictions: { where: { stage: "SELECTION" as const }, orderBy: [{ asOfAt: "desc" as const }, { id: "asc" as const }], include: { market: true, modelRun: { select: { trainedUntil: true, createdAt: true, method: true } } } }
 };
 
 function resultHeadline(fixture: { status: string; statusCode: string | null; elapsedMinute: number | null; homeGoals: number | null; awayGoals: number | null }): string {
@@ -95,10 +97,21 @@ export default async function ResearchWorkspace({ searchParams, view }: {
     ?? (fixtureId ? await db.fixture.findUnique({ where: { id: fixtureId }, include: fixtureInclude }) : null)
     ?? fixtures[0] : undefined;
 
-  const summaryFixtures = view === "history" ? await db.fixture.findMany({
-    where: { kickoff: { ...(summaryBounds.start ? { gte: summaryBounds.start } : {}), lt: summaryBounds.end }, predictions: { some: { stage: "SELECTION" } } },
-    orderBy: [{ kickoff: "desc" }, { id: "desc" }], take: 2000, include: highProbabilityFixtureInclude
-  }) : [];
+  // Batch every matching fixture; a display limit must never change the performance denominator.
+  const summaryFixtures = view === "history" ? await db.$transaction(async tx => {
+    const rows = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const batch = await tx.fixture.findMany({
+        where: { kickoff: { ...(summaryBounds.start ? { gte: summaryBounds.start } : {}), lt: summaryBounds.end }, predictions: { some: { stage: "SELECTION" } } },
+        orderBy: { id: "asc" }, take: 500, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}), include: highProbabilityFixtureInclude
+      });
+      rows.push(...batch);
+      if (batch.length < 500) break;
+      cursor = batch[batch.length - 1]!.id;
+    }
+    return rows.sort((a,b) => b.kickoff.getTime() - a.kickoff.getTime() || b.id.localeCompare(a.id));
+  }, { isolationLevel: "RepeatableRead", maxWait: 15_000, timeout: 60_000 }) : [];
 
   const highProbabilityRows = summaryFixtures.flatMap((fixture) => {
     const latestByMarketSelection = new Map<string, (typeof fixture.predictions)[number]>();
@@ -124,12 +137,13 @@ export default async function ResearchWorkspace({ searchParams, view }: {
     });
     const strongest = marketPicks.reduce<(typeof marketPicks)[number] | undefined>((best, row) => !best || Number(row.pick.probability) > Number(best.pick.probability) ? row : best, undefined);
     if (!strongest) return [];
-    const finishedScore = fixture.homeGoals !== null && fixture.awayGoals !== null
+    const finishedScore = fixture.status === "FINISHED" && fixture.homeGoals !== null && fixture.awayGoals !== null
         ? { home: fixture.homeGoals, away: fixture.awayGoals }
         : null;
     const outcome = finishedScore ? resolveSelection(strongest.market, strongest.pick.selection, finishedScore.home, finishedScore.away) : null;
     return [{ fixture, market: strongest.market, pick: strongest.pick, outcome }];
   });
+  const historyPrices = await loadResearchDecisionPrices(highProbabilityRows.map(row => row.pick.id));
 
   const screenCandidates = screening ? fixtures.flatMap((fixture) => {
     const pick = highProbabilityPick(fixture.predictions.map((row) => ({
@@ -253,10 +267,7 @@ export default async function ResearchWorkspace({ searchParams, view }: {
     highProbabilityGroups.set(year, years);
   }
   const summarizeSelectorRows = (rows: typeof highProbabilityRows) => {
-    const settled = rows.filter((row) => row.outcome !== null);
-    const won = settled.filter((row) => row.outcome === "WIN").length;
-    const lost = settled.filter((row) => row.outcome === "LOSS").length;
-    return { selected: rows.length, settled: settled.length, won, lost, hitRate: settled.length > 0 ? won / settled.length : null };
+    return summarizeResearchRows(rows.map(row => ({ probability: Number(row.pick.probability), odds: historyPrices.get(row.pick.id) ?? null, outcome: legOutcome(row.market, row.pick.selection, row.fixture) })));
   };
   const selectorSummaryRows = [
     ["MATCH_WINNER", ["HOME", "DRAW", "AWAY"]],
@@ -274,7 +285,7 @@ export default async function ResearchWorkspace({ searchParams, view }: {
     <td>{marketLabel(market)}</td>
     <td>{selectionLabel(pick.selection)}</td>
     <td className="num">{pct(Number(pick.probability))}</td>
-    <td>{outcome ? <span className={`status-badge ${outcome.toLowerCase()}`}>{outcome === "WIN" ? "Won" : "Lost"} · {score(fixture)}</span> : <span className="sr-only">Not played</span>}</td>
+    <td>{outcome ? <span className={`status-badge ${outcome.toLowerCase()}`}>{outcome === "WIN" ? "Won" : "Lost"} · {score(fixture)}</span> : <span>{fixture.status === "CANCELLED" || fixture.status === "POSTPONED" ? "Void" : "Pending"}</span>}</td>
   </tr>)}</tbody></table></div>;
 
   return <section>
@@ -313,7 +324,18 @@ export default async function ResearchWorkspace({ searchParams, view }: {
       <h2 id="research-high-probability-title">{highProbabilityRows.length} picks at or above {pct(HIGH_PROBABILITY_THRESHOLD)}</h2>
       <p className="research-history-intro">These are the model's highest-probability outcomes, not evidence-qualified selections. Inspect captured prices, quote freshness, and the fixture record before drawing any conclusion.</p>
       <RangeNav basePath="/research/model-history" range={summaryRange} today={today} paramNames={{ range: "summaryRange", from: "summaryFrom", to: "summaryTo" }} />
+      <p className="meta">Saved forecast fixture coverage in this range: {summaryFixtures.length ? `${formatDay(dateKey(summaryFixtures[summaryFixtures.length - 1]!.kickoff))} to ${formatDay(dateKey(summaryFixtures[0]!.kickoff))}` : "none"}. All {summaryFixtures.length} matching fixtures are included; no sample truncation. Only final results count as wins or losses.</p>
+      <p><Link href="/research/paper-validation">View prospective paper comparison and calibration readiness</Link></p>
       {highProbabilityRows.length > 0 && <section className="research-selector-summary" aria-labelledby="research-selector-summary-title"><div className="section-heading"><div><p className="eyebrow">MODEL SELECTOR</p><h3 id="research-selector-summary-title">Hit rates</h3></div><p className="meta">Pending picks are excluded from the hit-rate denominator</p></div><div className="matches-table-wrap"><table className="matches-table"><thead><tr><th>Selected market</th><th>Selection</th><th>Selected</th><th>Settled</th><th>Won</th><th>Lost</th><th>Hit rate</th></tr></thead><tbody>{selectorOutcomeRows.map((row) => <tr key={`${row.market}-${row.selection}`}><th scope="row">{marketLabel(row.market)}</th><td>{selectionLabel(row.selection)}</td><td className="num">{row.selected}</td><td className="num">{row.settled}</td><td className="num">{row.won}</td><td className="num">{row.lost}</td><td className="num">{row.hitRate === null ? "—" : pct(row.hitRate)}</td></tr>)}</tbody></table></div></section>}
+      {highProbabilityRows.length > 0 && <section aria-labelledby="research-paper-returns">
+        <h3 id="research-paper-returns">Calibration and paper returns</h3>
+        <p className="meta">One hypothetical unit per priced settled pick. Prices must have been captured and received, with source evidence, by forecast time. Uses current active-bookmaker priority; no freshness filter. This reconstructs historical performance, not placed bets. Missing prices remain unknown. Pending and void picks are excluded from both hit rate and ROI.</p>
+        <div className="matches-table-wrap"><table className="matches-table"><thead><tr><th>Selection</th><th>Mean forecast</th><th>Hit rate</th><th>Priced settled</th><th>Unpriced settled</th><th>Paper net (units)</th><th>Paper ROI</th></tr></thead><tbody>{selectorOutcomeRows.map(row => <tr key={row.market + row.selection}>
+          <th scope="row">{marketLabel(row.market)} · {selectionLabel(row.selection)}</th>
+          <td>{row.meanProbability === null ? "—" : pct(row.meanProbability)}</td><td>{row.hitRate === null ? "—" : pct(row.hitRate)}</td><td>{row.priced}</td><td>{row.unpriced}</td>
+          <td>{row.net === null ? "Unavailable" : row.net.toFixed(2)}</td><td>{row.roi === null ? "Unavailable" : pct(row.roi)}</td>
+        </tr>)}</tbody></table></div>
+      </section>}
       {highProbabilityRows.length === 0 ? <div className="notice">No high-probability market picks are available for {rangeLabel(summaryRange)}.</div> : <div className="research-high-probability-groups">{Array.from(highProbabilityGroups.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([year, months]) => {
         return <details key={year}><summary><strong>{year}</strong><small>{Array.from(months.values()).reduce((count, days) => count + Array.from(days.values()).reduce((dayCount, rows) => dayCount + rows.length, 0), 0)} market picks</small></summary><div className="research-high-probability-months">{Array.from(months.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([month, days]) => {
           return <details key={month}><summary><strong>{new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "Africa/Blantyre" }).format(new Date(`${month}-01T00:00:00.000Z`))}</strong><small>{Array.from(days.values()).reduce((count, rows) => count + rows.length, 0)} market picks</small></summary><div className="research-high-probability-days">{Array.from(days.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([dayKey, rows]) => <details key={dayKey}><summary><strong>{formatDay(dayKey)}</strong><small>{rows.length} market pick{rows.length === 1 ? "" : "s"}</small></summary>{renderHighProbabilityTable(rows)}</details>)}</div></details>;

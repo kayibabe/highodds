@@ -13,6 +13,10 @@ const CANDIDATE_SNAPSHOT_POLICY_VERSION = "acca-away-tier-guard-v2";
 export interface PublishResult { published: number; predicted: number; predictionsSkipped: number; }
 
 export async function publishTickets(now: Date): Promise<PublishResult> {
+  const targetDate = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+  if (await db.ticketVersion.findFirst({ where: { targetDate }, select: { id: true } })) {
+    return { published: 0, predicted: 0, predictionsSkipped: 0 };
+  }
   const forecast = await generatePredictions(now);
   const result = (published: number): PublishResult => ({ published, predicted: forecast.predicted, predictionsSkipped: forecast.skipped });
   const windowEnd = new Date(now.getTime() + SELECTION_WINDOW_MS);
@@ -130,7 +134,6 @@ export async function publishTickets(now: Date): Promise<PublishResult> {
   }
   if (candidates.length === 0) return result(0);
 
-  const targetDate = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
   const liveVersions = await db.ticketVersion.findMany({
     where: { targetDate, successors: { none: {} } },
     orderBy: { publishedAt: "desc" },
@@ -141,7 +144,7 @@ export async function publishTickets(now: Date): Promise<PublishResult> {
 
   // Tiers never share a fixture, including with today's tickets that stay live (locked, or not replaced).
   const drafts = buildTicketsAround(candidates, bookmakerPriority, now, [...openByTier.values()].map((version) => ({
-    tier: version.tier, locked: version.lockAt <= now, fixtureIds: version.legs.map((leg) => leg.fixtureId)
+    tier: version.tier, locked: true, fixtureIds: version.legs.map((leg) => leg.fixtureId)
   })));
   if (drafts.length === 0) return result(0);
 
@@ -161,6 +164,11 @@ export async function publishTickets(now: Date): Promise<PublishResult> {
   // versions, legs and their snapshot in one transaction prevents a retry/failure from presenting
   // an intended-but-never-published leg as selected in the research denominator.
   await db.$transaction(async (tx) => {
+    // A daily publication is immutable even before kickoff. Recheck under a
+    // transaction lock so simultaneous workers cannot publish competing sets.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`highodds:daily-tickets:${targetDate.toISOString()}`}))`;
+    const retained = await tx.ticketVersion.findFirst({ where: { targetDate }, select: { id: true } });
+    if (retained) return;
     const snapshot = await tx.candidateSnapshotRun.create({
       data: {
         targetDate, capturedAt: now, policyVersion: CANDIDATE_SNAPSHOT_POLICY_VERSION,

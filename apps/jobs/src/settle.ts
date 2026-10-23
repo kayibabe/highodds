@@ -75,6 +75,29 @@ const TICKET_LEG_RECHECK_MS = 15 * 60 * 1000;
 const STRAGGLER_RECHECK_MS = 60 * 60 * 1000;
 const LOOKBACK_MS = 48 * 60 * 60 * 1000;
 
+/** Refresh published-ticket fixtures soon after kickoff so LIVE status and minutes stay current. */
+export async function refreshLiveTicketFixtures(now: Date, client: Pick<ApiFootballClient, "getPaged"> = new ApiFootballClient()): Promise<{ requested: number; refreshed: number }> {
+  const at = (msAgo: number) => new Date(now.getTime() - msAgo);
+  const fixtures = await db.fixture.findMany({
+    where: {
+      status: { in: ["SCHEDULED", "LIVE"] },
+      kickoff: { gte: at(EARLIEST_FINISH_MS), lte: now },
+      receivedAt: { lt: at(RECENT_RECHECK_MS) },
+      ticketLegs: { some: { ticketVersion: { lockAt: { lte: now }, successors: { none: {} } } } }
+    },
+    orderBy: { kickoff: "asc" },
+    select: { providerId: true }
+  });
+
+  let refreshed = 0;
+  const providerIds = [...new Set(fixtures.map((fixture) => fixture.providerId))];
+  for (let i = 0; i < providerIds.length; i += REFRESH_BATCH_SIZE) {
+    const records = await client.getPaged("/fixtures", { ids: providerIds.slice(i, i + REFRESH_BATCH_SIZE).join("-") });
+    refreshed += (await ingestFixtures(records)).ingested;
+  }
+  return { requested: providerIds.length, refreshed };
+}
+
 /**
  * Runs on every cron tick so a match is recorded as FINISHED (and any ticket it completes is
  * settled) within minutes of full time instead of waiting for the daily SETTLE_RESULTS job. Only

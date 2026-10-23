@@ -5,7 +5,7 @@ import {
   isPickFilterActive, parsePickFilter, QUOTE_MAX_AGE_MINUTES, resolveDayRange, SCORELINE_MAX_GOALS, SELECTION_WINDOW_HOURS, TEAM_MIN_MATCHES,
   TICKET_TIERS, utcToday, type CalibrationBucket, type CandidateCohortPerformance, type DayRange, type PickFilter, type PickPerformance
 } from "@highodds/core";
-import { auth } from "../../auth";
+import { auth, isAuthDisabled, LOCAL_ACCESS_EMAIL } from "../../auth";
 import { loadCalibration, loadModelCoverage, loadModelPicks, loadPipelineHealth, loadTicketPerformance, loadUpcomingFunnel } from "../../lib/analysis";
 import { RangeNav, rangeLabel } from "../date-nav";
 import { FixtureCalendar } from "../fixture-calendar";
@@ -187,7 +187,7 @@ function describeFilter(filter: PickFilter): string {
 }
 
 export default async function AnalysisPage({ searchParams }: { searchParams: Promise<{ range?: string | string[]; from?: string | string[]; to?: string | string[]; pick?: string | string[]; minOdds?: string | string[] }> }) {
-  const session = await auth();
+  const session = isAuthDisabled() ? { user: { email: LOCAL_ACCESS_EMAIL, role: "ADMIN" as const } } : await auth();
   if (!session?.user?.email) redirect("/signin");
   if (session.user.role !== "ADMIN") redirect("/signin");
 

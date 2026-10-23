@@ -6,8 +6,9 @@ import { captureOddsCoverage } from "./odds-coverage.js";
 import { claimDueJobs, completeJob, ensureDailyJobs, failAndReleaseJob, requeueExpiredLeases } from "./schedule.js";
 import { NoTrainingDataError, assertTrainedAny, trainModel } from "./train.js";
 import { publishTickets } from "./publish.js";
-import { refreshFinishedFixtures, refreshPendingResults, settleResults } from "./settle.js";
+import { refreshFinishedFixtures, refreshLiveTicketFixtures, refreshPendingResults, settleResults } from "./settle.js";
 import { refreshPublishedTicketOdds } from "./ticket-odds-refresh.js";
+import { capturePaperResearch } from "./paper-research.js";
 
 const EXECUTION_TIMEOUT_MS = 4 * 60 * 1000;
 // Missing history won't fix itself within minutes; retry hourly so training resumes on its own after a backfill.
@@ -93,6 +94,13 @@ async function main(): Promise<void> {
   }
   await settleFinishedMatches();
   await refreshTicketOdds();
+  if (Date.now() < deadline - 15_000) {
+    try {
+      console.log("PAPER_RESEARCH", JSON.stringify(await capturePaperResearch(new Date())));
+    } catch (error) {
+      console.error("PAPER_RESEARCH failed:", error instanceof Error ? error.message : error);
+    }
+  }
 }
 
 /** Every tick, bounded evidence capture for prices observed after a ticket was published. */
@@ -111,6 +119,12 @@ async function refreshTicketOdds(): Promise<void> {
 async function settleFinishedMatches(): Promise<void> {
   if (Date.now() >= deadline - 30_000) return;
   const now = new Date();
+  try {
+    const live = await refreshLiveTicketFixtures(now);
+    if (live.requested > 0) console.log(`LIVE_FIXTURE_REFRESH requested=${live.requested} refreshed=${live.refreshed}`);
+  } catch (error) {
+    console.error("LIVE_FIXTURE_REFRESH failed:", error instanceof Error ? error.message : error);
+  }
   let refresh = { requested: 0, refreshed: 0 };
   try {
     refresh = await refreshFinishedFixtures(now);

@@ -190,6 +190,7 @@ model Fixture {
   ticketLegs  TicketLeg[]
   validationPicks ValidationPick[]
   candidateSnapshots CandidateSnapshot[]
+  paperDecisions PaperDecision[]
 
   @@index([kickoff, status])
   @@index([competitionId, kickoff])
@@ -278,6 +279,8 @@ model Prediction {
   probability Decimal  @db.Decimal(8, 6)
   modelRunId  String
   asOfAt      DateTime
+  /// Null on legacy rows; new forecasts carry a database insertion timestamp.
+  createdAt   DateTime? @default(now())
   stage       PredictionStage @default(SELECTION)
   fixture     Fixture  @relation(fields: [fixtureId], references: [id])
   market      Market   @relation(fields: [marketId], references: [id])
@@ -393,4 +396,49 @@ model AuditLog {
   actor     User?    @relation(fields: [actorId], references: [id])
 
   @@index([createdAt])
+}
+
+/// Frozen daily artifact for a versioned, paper-only research protocol.
+model PaperCalibration {
+  id          String @id @default(cuid())
+  policyVersion String
+  day         String
+  cutoffAt    DateTime
+  policyHash  String
+  artifactHash String
+  policy      Json
+  artifact    Json
+  createdAt   DateTime @default(now())
+  decisions   PaperDecision[]
+  @@unique([policyVersion, day])
+}
+
+/// Exactly one prospective snapshot per fixture and protocol, including PASS decisions.
+model PaperDecision {
+  id          String @id @default(cuid())
+  policyVersion String
+  fixtureId   String
+  calibrationId String
+  decidedAt   DateTime
+  kickoff     DateTime
+  evidence    Json
+  evidenceHash String
+  createdAt   DateTime @default(now())
+  fixture     Fixture @relation(fields: [fixtureId], references: [id], onDelete: Restrict)
+  calibration PaperCalibration @relation(fields: [calibrationId], references: [id], onDelete: Restrict)
+  outcome     PaperOutcome?
+  @@unique([policyVersion, fixtureId])
+  @@index([decidedAt])
+}
+
+/// Append-only observed final result; later model fits use only outcomes recorded before their cutoff.
+model PaperOutcome {
+  id          String @id @default(cuid())
+  decisionId  String @unique
+  status      String
+  homeGoals   Int?
+  awayGoals   Int?
+  resultReceivedAt DateTime
+  recordedAt  DateTime @default(now())
+  decision    PaperDecision @relation(fields: [decisionId], references: [id], onDelete: Restrict)
 }

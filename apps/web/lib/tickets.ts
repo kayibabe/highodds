@@ -28,9 +28,9 @@ type TicketWhere = NonNullable<NonNullable<Parameters<typeof db.ticketVersion.fi
  * legs that decided the ticket. Settled tickets read the immutable settlement evidence; unsettled
  * tickets preview the same rules against the latest stored fixture state.
  */
-export async function loadTicketCards(where: TicketWhere, take?: number): Promise<TicketCardData[]> {
+export async function loadTicketCards(where: TicketWhere, take?: number, includeSuperseded = false): Promise<TicketCardData[]> {
   const tickets = await db.ticketVersion.findMany({
-    where: { ...where, successors: { none: {} } },
+    where: { ...where, ...(includeSuperseded ? {} : { successors: { none: {} } }) },
     orderBy: [{ targetDate: "desc" }, { tier: "asc" }, { publishedAt: "desc" }],
     take,
     include: { legs: { include: { fixture: { include: { competition: true, homeTeam: true, awayTeam: true } } } }, settlements: true }

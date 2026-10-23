@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "jobs:run-due": "tsx src/run-due.ts",
+    "jobs:paper-research": "tsx src/paper-research-cli.ts",
     "jobs:backfill-fixtures": "tsx src/backfill-fixtures-cli.ts",
     "jobs:settle-played": "tsx src/settle-played-cli.ts",
     "lint": "tsc --noEmit",

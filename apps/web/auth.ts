@@ -5,12 +5,16 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { verify } from "@node-rs/argon2";
 import { db } from "@highodds/db";
 
+export const LOCAL_ACCESS_EMAIL = "local@highodds.test";
+export function isAuthDisabled(): boolean { return process.env.AUTH_DISABLED === "true"; }
+
 /**
  * Resolves entitlement from the database on every protected server render. JWTs are deliberately
  * short on authorization facts: a subscriber whose paid period has ended must not retain access
  * until the token itself expires.
  */
 export async function activeUser(): Promise<{ id: string; email: string; role: "ADMIN" | "SUBSCRIBER" } | null> {
+  if (isAuthDisabled()) return { id: "local-development", email: LOCAL_ACCESS_EMAIL, role: "ADMIN" };
   const session = await auth();
   if (!session?.user?.email) return null;
   const user = await db.user.findUnique({

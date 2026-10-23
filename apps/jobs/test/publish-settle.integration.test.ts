@@ -44,7 +44,8 @@ describe.skipIf(!databaseUrl)("publishTickets and settleResults (live DB)", () =
     // targetDate/tier" check isn't scoped to a single bookmaker -- so a fixed date would collide
     // with the previous run's ticket on every re-run. Spreading `now` over ~8 years of RUN_SEED
     // keeps every run's targetDate effectively unique.
-    const now = new Date(Date.UTC(2026, 1, 1, 8, 0, 0) + RUN_SEED * 24 * 60 * 60 * 1000);
+    // Always future-relative: historical fixture receipts must predate this synthetic forecast.
+    const now = new Date(Date.now() + RUN_SEED * 24 * 60 * 60 * 1000);
     const kickoff1 = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     const kickoff2 = new Date(now.getTime() + 3 * 60 * 60 * 1000);
     const capturedAt = new Date(now.getTime() - 30 * 60 * 1000);
@@ -150,9 +151,10 @@ describe.skipIf(!databaseUrl)("publishTickets and settleResults (live DB)", () =
     afterAll(async () => {
       await db.prediction.deleteMany({ where: { fixtureId: { in: [fixture1Id, fixture2Id] } } });
       await db.modelRun.deleteMany({ where: { id: modelRunId } });
-      await db.oddsQuote.deleteMany({ where: { fixtureId: { in: [fixture1Id, fixture2Id] } } });
-      await db.market.deleteMany({ where: { id: marketWinnerId } });
-      await db.bookmaker.deleteMany({ where: { id: bookmakerId } });
+      // Published candidate evidence owns its quote permanently; keep that synthetic graph.
+      await db.oddsQuote.deleteMany({ where: { fixtureId: { in: [fixture1Id, fixture2Id] }, candidateSnapshots: { none: {} }, validationPicks: { none: {} } } });
+      await db.market.deleteMany({ where: { id: marketWinnerId, quotes: { none: {} } } });
+      await db.bookmaker.deleteMany({ where: { id: bookmakerId, quotes: { none: {} } } });
     });
 
     it("publishes a STANDARD-tier ticket from a positive-EV mispriced quote", async () => {
@@ -204,7 +206,7 @@ describe.skipIf(!databaseUrl)("publishTickets and settleResults (live DB)", () =
     const HISTORY_TARGET = 50;
     // Separate from the full-pipeline scenario's date range offset so the two suites' targetDates
     // (and selection windows) don't meet on the same run.
-    const now = new Date(Date.UTC(2026, 1, 1, 9, 0, 0) + RUN_SEED * 24 * 60 * 60 * 1000);
+    const now = new Date(Date.now() + RUN_SEED * 24 * 60 * 60 * 1000);
     const capturedAt = new Date(now.getTime() - 30 * 60 * 1000);
     // Lower than the full-pipeline scenario's 1.3: at 1.3 three legs (~21.2) overshoot VALUE into HIGH.
     const HOME_GENEROSITY = 1.2;
@@ -300,9 +302,9 @@ describe.skipIf(!databaseUrl)("publishTickets and settleResults (live DB)", () =
     afterAll(async () => {
       await db.prediction.deleteMany({ where: { fixtureId: { in: scenarioFixtureIds } } });
       await db.modelRun.deleteMany({ where: { id: { in: modelRunIds } } });
-      await db.oddsQuote.deleteMany({ where: { fixtureId: { in: scenarioFixtureIds } } });
-      await db.market.deleteMany({ where: { id: marketId } });
-      await db.bookmaker.deleteMany({ where: { id: bookmakerId } });
+      await db.oddsQuote.deleteMany({ where: { fixtureId: { in: scenarioFixtureIds }, candidateSnapshots: { none: {} }, validationPicks: { none: {} } } });
+      await db.market.deleteMany({ where: { id: marketId, quotes: { none: {} } } });
+      await db.bookmaker.deleteMany({ where: { id: bookmakerId, quotes: { none: {} } } });
     });
 
     it("publishes STANDARD and VALUE tickets whose persisted legs share no fixture", async () => {
@@ -328,11 +330,12 @@ describe.skipIf(!databaseUrl)("publishTickets and settleResults (live DB)", () =
       expect(await db.candidateSnapshot.count({ where: { runId: snapshotId!, selected: true } })).toBe(legFixtureIds.length);
     });
 
-    it("keeps tiers disjoint when a re-run replaces the unlocked tickets", async () => {
-      // Same day, still before the first kickoff: both tickets are unlocked, so the re-run
-      // supersedes them. The live (unsuperseded) set must still be fixture-disjoint.
+    it("retains the original daily set even before the first kickoff", async () => {
+      const before = await db.ticketVersion.findMany({ where: { bookmakerId }, orderBy: { id: "asc" } });
       const rerunNow = new Date(now.getTime() + 10 * 60 * 1000);
-      await publishTickets(rerunNow);
+      expect((await publishTickets(rerunNow)).published).toBe(0);
+      const after = await db.ticketVersion.findMany({ where: { bookmakerId }, orderBy: { id: "asc" } });
+      expect(after.map((version) => version.id)).toEqual(before.map((version) => version.id));
 
       const live = await db.ticketVersion.findMany({ where: { bookmakerId, successors: { none: {} } }, include: { legs: true } });
       expect(live.map((version) => version.tier).sort()).toEqual(["STANDARD", "VALUE"]);

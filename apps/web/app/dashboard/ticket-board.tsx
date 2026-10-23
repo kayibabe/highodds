@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
-import { LEG_OUTCOME_LABEL, selectionLabel } from "../../lib/selection";
+import { LEG_OUTCOME_LABEL, selectionLabel, selectionTone } from "../../lib/selection";
 
 export type TicketLegData = {
   id: string;
@@ -173,7 +173,7 @@ function DetailPanel({ selected, onClose }: { selected: SelectedLeg; onClose: ()
         </div>
 
         <div className="selection-facts">
-          <div><small>Market</small><strong>{leg.market}: {selectionLabel(leg.selection)}</strong></div>
+          <div><small>Market</small><strong><span className={`market-pick ${selectionTone(leg.selection)}`}>{leg.market}: {selectionLabel(leg.selection)}</span></strong></div>
           <div><small>Snapshot odds</small><strong>{leg.odds.toFixed(2)}×</strong></div>
           <div><small>Match state</small><strong>{matchState(leg)}</strong></div>
           <div><small>Score</small><strong>{score ?? "Not recorded"}</strong></div>
@@ -189,7 +189,7 @@ function DetailPanel({ selected, onClose }: { selected: SelectedLeg; onClose: ()
           {view === "overview" && <>
             <h3>Selection overview</h3>
             <dl>
-              <div><dt>Published selection</dt><dd>{leg.market}: {selectionLabel(leg.selection)}</dd></div>
+              <div><dt>Published selection</dt><dd><span className={`market-pick ${selectionTone(leg.selection)}`}>{leg.market}: {selectionLabel(leg.selection)}</span></dd></div>
               <div><dt>Kickoff</dt><dd>{time(leg.kickoff)}</dd></div>
               <div><dt>Ticket published</dt><dd>{utcTime(ticket.publishedAt)}</dd></div>
               <div><dt>Ticket lock</dt><dd>{utcTime(ticket.lockAt)}</dd></div>
@@ -306,7 +306,7 @@ export default function TicketBoard({ tickets, eyebrow = "PRIMARY RESEARCH OUTPU
                       <span className="premium-leg-main">
                         <strong>{leg.home} <span>vs</span> {leg.away}</strong>
                         <small>{leg.competition} · {time(leg.kickoff)}</small>
-                        <span className="premium-leg-market">{leg.market}: {selectionLabel(leg.selection)}</span>
+                        <span className={`premium-leg-market market-pick ${selectionTone(leg.selection)}`}>{leg.market}: {selectionLabel(leg.selection)}</span>
                         <span className="premium-leg-market">{matchState(leg)} · Score {scoreline(leg)}</span>
                         {note && <small className="leg-decisive-note">{note}</small>}
                       </span>

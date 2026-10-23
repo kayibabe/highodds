@@ -19,13 +19,13 @@ export const MAX_TICKET_ODDS_FIXTURES_PER_TICK = 12;
 /** Fixture discovery covers today and the following six Africa/Blantyre calendar days. */
 export const FIXTURE_LOOKAHEAD_DAYS = 7;
 
-/** Daily jobs, created idempotently per UTC day. 06:00 UTC is 08:00 Africa/Blantyre. */
+/** Daily jobs, created idempotently per UTC day. 05:00 UTC is 07:00 Africa/Blantyre. */
 export const DAILY_JOB_SCHEDULE = [
   { jobType: "INGEST_FIXTURES", utcTime: "00:05" },
-  { jobType: "TRAIN_MODEL", utcTime: "05:00" },
-  { jobType: "INGEST_ODDS", utcTime: "05:30" },
-  { jobType: "VERIFY_ODDS_COVERAGE", utcTime: "05:45" },
-  { jobType: "PUBLISH_TICKETS", utcTime: "06:00" },
+  { jobType: "TRAIN_MODEL", utcTime: "04:00" },
+  { jobType: "INGEST_ODDS", utcTime: "04:30" },
+  { jobType: "VERIFY_ODDS_COVERAGE", utcTime: "04:45" },
+  { jobType: "PUBLISH_TICKETS", utcTime: "05:00" },
   { jobType: "EVENING_FORECAST", utcTime: "20:00" },
   { jobType: "SETTLE_RESULTS", utcTime: "21:00" }
 ] as const;

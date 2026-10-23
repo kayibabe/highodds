@@ -23,13 +23,14 @@ function BrandMark() {
 }
 
 const WORKFLOW: NavGroup[] = [
-  { label: "Betting desk", icon: "sparkles", children: [
+  { label: "Today", icon: "sparkles", children: [
     { href: "/dashboard/research", label: "Today’s Intelligence", icon: "sparkles", hint: "Published paper tickets and supporting signals" },
     { href: "/dashboard/high-probability", label: "Forecast Finder", icon: "chart", hint: "Filter forecasts with historical calibration evidence" }
   ] },
   { label: "Investigate", icon: "search", children: [
     { href: "/research", label: "Fixture Inspector", icon: "search", hint: "Inspect a fixture’s forecasts, prices and result" },
     { href: "/research/screener", label: "Historical Screener", icon: "chart", hint: "Filter historical forecasts and captured prices" },
+    { href: "/research/probability-bands", label: "Probability Mixes", icon: "chart", hint: "Review prospective model and bookmaker probability bands" },
     { href: "/research/model-history", label: "Forecast Archive", icon: "chart", hint: "Model selection archive and outcome hit rates" }
   ] },
   { label: "Review", icon: "chart", children: [
@@ -59,7 +60,7 @@ function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function AppShell({ email, isAdmin, children }: Readonly<{ email: string | null; isAdmin: boolean; children: ReactNode }>) {
+export default function AppShell({ email, isAdmin, localAccess, children }: Readonly<{ email: string | null; isAdmin: boolean; localAccess: boolean; children: ReactNode }>) {
   const pathname = usePathname() ?? "/";
   const router = useRouter();
 
@@ -67,7 +68,10 @@ export default function AppShell({ email, isAdmin, children }: Readonly<{ email:
     return <div className="auth-standalone"><div className="auth-theme"><ThemeToggle /></div>{children}</div>;
   }
 
-  const workflow = email ? WORKFLOW : [];
+  // Keep the research navigation visible before sign-in. Public research and
+  // results pages remain usable, while protected dashboard pages redirect to
+  // sign-in when selected.
+  const workflow = WORKFLOW;
   const currentGroup = workflow.find((item) => item.children.some((child) => isActive(pathname, child.href)));
   const mobileItems = email ? [...workflow.map((group) => ({ href: group.children[0]!.href, label: group.label, icon: group.icon, hint: group.label })), ...(isAdmin ? ADMIN_ITEMS : [])] : [SIGN_IN];
 
@@ -102,7 +106,9 @@ export default function AppShell({ email, isAdmin, children }: Readonly<{ email:
           </>}
         </nav>
         <div className="sidebar-account">
-          {email ? (
+          {localAccess ? (
+            <span className="auth-status">Local access enabled</span>
+          ) : email ? (
             <div className="auth-session">
               <span className="auth-status" title={email}>{isAdmin ? "Admin" : "Subscriber"} · {email}</span>
               <form action={signOutAction}><button type="submit" className="theme-btn auth-signout">Sign out</button></form>
@@ -120,7 +126,7 @@ export default function AppShell({ email, isAdmin, children }: Readonly<{ email:
           <ThemeToggle />
         </div>
         <button type="button" className="global-refresh" onClick={() => router.refresh()} title="Refresh current page" aria-label="Refresh current page">↻ <span>Refresh</span></button>
-        {email && <form action={signOutAction} className="header-signout"><button type="submit" className="theme-btn">Sign out</button></form>}
+        {email && !localAccess && <form action={signOutAction} className="header-signout"><button type="submit" className="theme-btn">Sign out</button></form>}
       </header>
 
       <main className="main" id="main-content" tabIndex={-1}>

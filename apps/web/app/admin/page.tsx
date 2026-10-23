@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { db } from "@highodds/db";
-import { auth } from "../../auth";
+import { auth, isAuthDisabled, LOCAL_ACCESS_EMAIL } from "../../auth";
 import { FixtureCalendar } from "../fixture-calendar";
 import { extendSubscriber, retrainNow, retryJob, toggleAdminRole, toggleBookmakerActive } from "./actions";
 
@@ -19,7 +19,7 @@ function coverage(job: { jobType: string; payload: unknown }): string {
 }
 
 export default async function AdminPage() {
-  const session = await auth();
+  const session = isAuthDisabled() ? { user: { email: LOCAL_ACCESS_EMAIL, role: "ADMIN" as const } } : await auth();
   if (!session?.user?.email) redirect("/signin");
   if (session.user.role !== "ADMIN") redirect("/signin");
 

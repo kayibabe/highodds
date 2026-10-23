@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@500&display=swap');
-
 /* ── Tokens (ported from lohela's design system) ─────────────── */
 :root {
   --bg:        #fbfbfa;
@@ -31,8 +29,8 @@
   --shadow:    0 2px 8px rgba(35,24,42,.055);
   --shadow-md: 0 5px 16px rgba(35,24,42,.08);
 
-  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'DM Mono', ui-monospace, monospace;
+  --font: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: var(--font);
 
   color-scheme: light;
 }
@@ -423,6 +421,7 @@ h2 { font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.015em; margin: 30p
 .matches-table-wrap { overflow-x: visible; }
 .matches-table { min-width: 0; }
 .matches-table td.match-pick { white-space: normal; }
+.match-result > strong { margin-right: 8px; }
 .match-pick > span:first-child, .match-ticket-leg > span:first-child { margin-right: 6px; }
 .match-pick small { color: var(--muted); font-variant-numeric: tabular-nums; }
 .match-pick .leg-outcome { min-width: 0; padding: 1px 7px; }
@@ -480,6 +479,28 @@ h2 { font-size: 1.25rem; line-height: 1.3; letter-spacing: -0.015em; margin: 30p
 .research-high-probability > summary > span, .research-screener > summary > span { display: grid; gap: 3px; }
 .research-high-probability > summary small, .research-screener > summary > small { max-width: 420px; color: var(--muted); font-size: 11px; text-align: right; }
 .research-history-intro { max-width: 760px; color: var(--text2); font-size: 13px; }
+.probability-bands-page { display: grid; gap: 20px; }
+.probability-bands-notice { display: grid; gap: 4px; }
+.probability-bands-notice p { margin: 0; }
+.probability-bands-panel { display: grid; gap: 12px; padding: 18px; border: 1px solid var(--border); border-radius: var(--r-xl); background: var(--surface); }
+.probability-bands-panel h2 { margin: 2px 0 0; font-size: clamp(1.1rem, 2.5vw, 1.4rem); }
+.probability-bands-copy { max-width: 980px; color: var(--text2); font-size: 12px; }
+.probability-bands-table { min-width: 760px; }
+.probability-bands-table td, .probability-bands-table th { font-variant-numeric: tabular-nums; }
+.probability-bands-table .probability-bands-subline { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.probability-bands-exploratory { display: grid; gap: 10px; }
+.probability-bands-exploratory summary { width: fit-content; color: var(--text2); cursor: pointer; font-size: 12px; font-weight: 700; }
+.probability-bands-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.probability-bands-kpis article { display: grid; min-width: 0; gap: 4px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface2); }
+.probability-bands-kpis small { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .035em; }
+.probability-bands-kpis strong { overflow-wrap: anywhere; font-size: 19px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.probability-bands-kpis span { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.probability-bands-kpis .positive { color: var(--positive); }
+.probability-bands-kpis .negative { color: var(--negative); }
+.probability-bands-status { display: inline-flex; padding: 3px 8px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); font-size: 10px; white-space: nowrap; }
+.probability-bands-page .empty-state { padding: 14px; border: 1px dashed var(--border2); border-radius: var(--r); color: var(--muted); font-size: 12px; }
+@media (max-width: 900px) { .probability-bands-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .probability-bands-panel { padding: 13px; } .probability-bands-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
   .research-high-probability > summary, .research-screener > summary { align-items: flex-start; flex-wrap: wrap; }
   .research-high-probability > summary small, .research-screener > summary > small { max-width: none; text-align: left; }
@@ -916,3 +937,31 @@ button.theme-btn, a.theme-btn { width: auto; min-width: 42px; margin: 0; padding
   .flow-steps { grid-template-columns: 1fr; }
   .hero-actions > * { width: 100%; }
 }
+
+/* Keep the same market-pick palette as the other local football apps. */
+.market-pick { display: inline-flex; width: fit-content; max-width: 100%; padding: 2px 7px; border: 1px solid transparent; border-radius: 999px; font-size: .9em; font-weight: 700; line-height: 1.45; }
+.market-pick-over { color: #0f766e; background: #ccfbf1; border-color: #5eead4; }
+.market-pick-under { color: #1d4ed8; background: #dbeafe; border-color: #93c5fd; }
+.market-pick-home { color: #4338ca; background: #e0e7ff; border-color: #a5b4fc; }
+.market-pick-draw { color: #92400e; background: #fef3c7; border-color: #fcd34d; }
+.market-pick-away { color: #be123c; background: #ffe4e6; border-color: #fda4af; }
+.market-pick-yes { color: #0e7490; background: #cffafe; border-color: #67e8f9; }
+.market-pick-no { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+.market-pick-cover { color: #6d28d9; background: #ede9fe; border-color: #c4b5fd; }
+.market-pick-other { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
+:root[data-theme="dark"] .market-pick-over { color: #5eead4; background: rgb(13 148 136 / 15%); border-color: rgb(45 212 191 / 35%); }
+:root[data-theme="dark"] .market-pick-under { color: #93c5fd; background: rgb(37 99 235 / 15%); border-color: rgb(96 165 250 / 35%); }
+:root[data-theme="dark"] .market-pick-home { color: #a5b4fc; background: rgb(79 70 229 / 15%); border-color: rgb(129 140 248 / 35%); }
+:root[data-theme="dark"] .market-pick-draw { color: #fcd34d; background: rgb(217 119 6 / 15%); border-color: rgb(251 191 36 / 35%); }
+:root[data-theme="dark"] .market-pick-away { color: #fda4af; background: rgb(225 29 72 / 15%); border-color: rgb(251 113 133 / 35%); }
+:root[data-theme="dark"] .market-pick-yes { color: #67e8f9; background: rgb(8 145 178 / 15%); border-color: rgb(34 211 238 / 35%); }
+:root[data-theme="dark"] .market-pick-no, :root[data-theme="dark"] .market-pick-other { color: #cbd5e1; background: rgb(100 116 139 / 15%); border-color: rgb(148 163 184 / 35%); }
+:root[data-theme="dark"] .market-pick-cover { color: #c4b5fd; background: rgb(124 58 237 / 15%); border-color: rgb(167 139 250 / 35%); }
+
+/* Shared typography baseline for the Windows 11 system font and calmer weight hierarchy. */
+:root { --system-font: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif; }
+body, button, input, select, textarea { font-family: var(--system-font); }
+body :is(h1, h2, h3, h4, h5, h6) { font-weight: 600; }
+body :is(strong, b) { font-weight: 600; }
+body :is(.eyebrow, .sidebar-label, .nav-group-title) { font-weight: 500; }
+body :is(.nav-tab, .brand-name, .status-pill, .ticket-label, .principle-index, .flow-steps span) { font-weight: 600; }

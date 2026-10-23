@@ -186,9 +186,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {visiblePicks.length === 0 ? <div className="notice">{pricedOnly ? "No priced signals meet the current filters." : `No matches have ${pickFilter.value === "ALL" ? "an eligible model pick" : `${pickFilter.label} as their strongest model pick`} at ${minimumPercent}% and above for ${formatDay(day)}. Try another model pick, a lower threshold or another date.`}</div> : (
           <div className="matches-table-wrap">
             <table className="matches-table">
-              <thead><tr><th>Time</th><th>Match</th><th>Model pick</th><th>Match odds</th><th>Historical evidence</th><th>Paper ticket</th></tr></thead>
+              <thead><tr><th>Time</th><th>Match</th><th>Model pick</th><th>Result</th><th>Match odds</th><th>Historical evidence</th><th>Paper ticket</th></tr></thead>
               <tbody>{visiblePicks.map(({ fixture, pick, quote, outcome: pickOutcome }) => {
                 const legs = legsByFixture.get(fixture.id) ?? [];
+                const resultOutcome = fixture.status === "POSTPONED" || fixture.status === "CANCELLED" ? "VOID" : pickOutcome;
                 const evidence = forecastEvidence(evidenceRows, { fixtureId: fixture.id, competitionId: fixture.competitionId,
                   market: pick.marketKey!, selection: pick.selection, method: pick.method, probability: pick.probability, forecastAt: pick.asOfAt });
                 return (
@@ -200,6 +201,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       <small>{forecastStageLabel(pick.stage)} · {BLANTYRE_RECEIVED.format(pick.asOfAt)}</small>
                       {pickOutcome && pickOutcome !== "PENDING" && <span className={`status-badge leg-outcome ${pickOutcome.toLowerCase()}`}>{LEG_OUTCOME_LABEL[pickOutcome]}</span>}
                     </> : <span className="match-pick-none">—</span>}</td>
+                    <td className="match-result">{fixture.homeGoals !== null && fixture.awayGoals !== null ? <>
+                      <strong>{fixture.homeGoals}–{fixture.awayGoals}</strong>
+                      <span className={`status-badge leg-outcome ${resultOutcome.toLowerCase()}`}>{LEG_OUTCOME_LABEL[resultOutcome] ?? resultOutcome}</span>
+                    </> : resultOutcome === "VOID" ? <>
+                      <strong>Void</strong><small>{fixture.status}</small>
+                    </> : <span className="match-pick-none">Pending</span>}</td>
                     <td className="match-odds">{quote ? <><strong>{Number(quote.decimalOdds).toFixed(2)}</strong><small>{quote.bookmaker.name}<br />Captured {BLANTYRE_RECEIVED.format(quote.capturedAt)}</small></> : <span className="match-pick-none">No eligible active-bookmaker price</span>}</td>
                     <td className="match-calibration">
                       <p>{evidence.observed === null ? "No comparable results." : <>Observed <strong>{(evidence.observed * 100).toFixed(1)}%</strong> · <strong>{evidence.matches}</strong> comparisons</>}</p>

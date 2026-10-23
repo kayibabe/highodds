@@ -11,3 +11,4 @@ export * from "./fixture-calendar.js";
 export * from "./prediction-window.js";
 export * from "./analysis.js";
 export * from "./forecast-evidence.js";
+export * from "./paper-research.js";

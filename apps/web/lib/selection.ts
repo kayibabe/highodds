@@ -11,6 +11,19 @@ export function selectionLabel(selection: string): string {
   return total ? `${total[1] === "OVER" ? "Over" : "Under"} ${total[2]}.${total[3]}` : selection;
 }
 
+export function selectionTone(selection: string): string {
+  const value = selection.toUpperCase();
+  if (value.startsWith("OVER") || value.includes("_OVER")) return "market-pick-over";
+  if (value.startsWith("UNDER") || value.includes("_UNDER")) return "market-pick-under";
+  if (value === "HOME") return "market-pick-home";
+  if (value === "DRAW") return "market-pick-draw";
+  if (value === "AWAY") return "market-pick-away";
+  if (value === "YES") return "market-pick-yes";
+  if (value === "NO") return "market-pick-no";
+  if (["1X", "X2", "12"].includes(value)) return "market-pick-cover";
+  return "market-pick-other";
+}
+
 const SHORT_MARKET: Record<string, string> = { MATCH_WINNER: "1X2", TOTAL_GOALS: "Goals", BTTS: "BTTS" };
 
 /** Compact "market: selection" label for table cells, e.g. "BTTS: Yes", "Goals: Over 2.5". */

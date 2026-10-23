@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
+import { isAuthDisabled } from "../../auth";
 import { adminSignIn, subscriberSignIn } from "./actions";
 
 export default async function SignIn({ searchParams }: { searchParams: Promise<{ error?: string; sent?: string }> }) {
+  if (isAuthDisabled()) redirect("/");
   const { error, sent } = await searchParams;
   return (
     <section className="auth-page" aria-labelledby="auth-page-title">

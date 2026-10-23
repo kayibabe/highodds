@@ -1,4 +1,4 @@
-import { shortPickLabel } from "../../lib/selection";
+import { selectionTone, shortPickLabel } from "../../lib/selection";
 import type { DailyModelPick } from "../../lib/analysis";
 
 const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Blantyre", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -19,7 +19,7 @@ export default function ModelPicks({ day, picks }: { day: string; picks: DailyMo
         <tbody>{picks.map((pick) => <tr key={`${pick.fixtureId}-${pick.marketKey}`}>
           <td className="num">{time.format(pick.kickoff)}</td>
           <th scope="row"><a href={`/research?date=${day}&fixture=${pick.fixtureId}`}>{pick.homeTeam} vs {pick.awayTeam}</a><small>{pick.competition}</small></th>
-          <td>{shortPickLabel(pick.marketKey, pick.selection)}</td>
+          <td><span className={`market-pick ${selectionTone(pick.selection)}`}>{shortPickLabel(pick.marketKey, pick.selection)}</span></td>
           <td className="num">{pct(pick.probability)}</td>
           <td><span className={`status-badge ${pick.outcome.toLowerCase()}`}>{pick.outcome === "WIN" ? "Won" : "Lost"}</span></td>
           <td>{pick.onTicket ? <span className="status-badge win">Matched</span> : <span className="match-pick-none">Not selected</span>}</td>

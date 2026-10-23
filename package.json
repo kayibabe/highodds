@@ -15,7 +15,7 @@
   },
   "devDependencies": {
     "@prisma/client": "^6.19.3",
-    "prisma": "^6.19.3",
+    "prisma": "^8.0.0-rc.22",
     "railway": "^3.12.0"
   },
   "engines": {
